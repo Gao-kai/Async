@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<title></title>
+	</head>
+	<body>
+		<script type="text/javascript">
+			/* 获取学生语文成绩的请求 */
+			function getUserScore() {
+				return new Promise((resolve, reject) => {
+					let userScore;
+					setTimeout(() => {
+						userScore = 100;
+						resolve(userScore);
+						// throw new Error('1896');
+					}, 1500)
+				});
+			}
+
+			/* 获取学生排名的请求 */
+			function getUserRank(score) {
+				// 只有获取到成绩之后才可以请求排名信息
+				return new Promise((resolve, reject) => {
+					let rank;
+					setTimeout(() => {
+						rank = score == 100 ? '第一名' : '第二名';
+						resolve(rank);
+					}, 1000)
+				});
+			}
+
+			function* demo(){
+				
+			}
+			console.log(demo);
+			console.log(demo()); // 作用知识创建返回一个generator对象
+			// 但是方法中的代码还没有执行
+			let type = Object.prototype.toString.call(demo())
+			console.log(type); // [object Generator]
+			
+			// 没调用一次next方法，就开始执行函数体中的代码，直到遇到一个yield之后暂停执行
+			// next方法的返回值是{value:"A",done:false}
+			// 返回的对象中value存储的是yield的结果，done存储的是否已经将函数体中的代码执行完成了
+			// 3个yield 一定需要3+1次next才可以返回true
+			// {value:undefined,done:true}
+			// 后续继续执行，还是会返回上面一样的特点
+			
+			function A(){
+				return new Promise((resolve,reject)=>{
+					setTimeout(()=>{
+						resolve(100);
+					},1000)
+				})
+			}
+			
+			function B(){
+				return new Promise((resolve,reject)=>{
+					setTimeout(()=>{
+						resolve(200);
+					},1500)
+				})	
+			}
+			
+			function* init(){
+				yield A().then();
+				yield B();
+			}
+			
+			let x = init();
+			let v1,v2;
+			x.next().value.then(res=>{
+				v1 = res;
+			})
+			
+			x.next().value.then(res=>{
+				v2 = res;
+			})
+			
+			console.log(v1,v2);
+			
+		</script>
+	</body>
+</html>
