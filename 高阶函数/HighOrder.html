@@ -6,100 +6,93 @@
 	</head>
 	<body>
 		<script type="text/javascript">
-			/*
-			 满足参数个数就是返回结果 链式调用
-			 add(1)(2,3)(4)
-			 */
-			
+			// 实现add(1)(2,3)(4)输出为10
 			function add(a,b,c,d){
-				return a+b+c+d;
+				return [].slice.call(arguments).reduce((a,b)=>a+b);
 			}
 			
-			function currying1(fn){
-				// 第一次执行是[] 后续会持续缓存
-				let cacheParams = Array.from(arguments).slice(1);
-				// 如果要求fn函数传入的参数为0时执行
-				return function Temp(...args){
-					// 缓存本次传入的参数
-					cacheParams = cacheParams.concat(args);
-					if(args.length === 0){
-						// 取出缓存的参数 执行并返回结果
-						return fn.apply(null,cacheParams);
-					}
-					// 否则返回Temp引用并刷新cacheParams
-					return Temp;
-				}
-				
-			}
-			
-			function currying2(fn){
-				// 第一次执行是[] 后续会持续缓存
-				let cacheParams = Array.from(arguments).slice(1);
-				// 如果要求fn函数传入的参数为0时执行
-				return function Temp(...args){
-					// 缓存本次传入的参数
-					cacheParams = cacheParams.concat(args);
-					
-					// 如果缓存的参数个数已经大于等于fn函数的形参个数
-					if(cacheParams.length >= fn.length){
-						// 取出缓存的参数 执行并返回结果
-						return fn.apply(null,cacheParams);
-					}
-					
-					// 否则返回Temp引用并刷新cacheParams
-					return Temp;
-				}
-				
-			}
-			
-			add = currying2(add);
-			add(1);
-			add(2,3);
-			add(4);
-			console.log(add(4));
-			
-			var total = 0;
-			function countMoney(money){
-				total += money;
-			}
-			// countMoney(100);
-			// countMoney(200);
-			// countMoney(300);
-			// console.log(total);
-			
-			countMoney = currying1(countMoney);
-			countMoney(100);
-			countMoney(200);
-			countMoney(300);
-			countMoney();
-			console.log(total);
-			
-			
-			function sum(){
-				return Array.from(arguments).reduce((a,b)=>a+b);
-			}
-			
-			// maxParamsLen指的是要柯里化的参数执行的最大参数个数
-			function currying3(fn,maxParamsLen){
-				// 除去fn,maxParamsLen两个参数
+			// common function currying
+			function currying(fn){
 				let cacheParams = [];
-				
 				return function Temp(...innerArgs){
-					// 保存每次进来的参数
 					cacheParams = cacheParams.concat(innerArgs);
-					// 参数满足条件就执行
-					if(cacheParams.length >= maxParamsLen){
-						return fn.apply(null,cacheParams);
+					if(innerArgs.length === fn.length){
+						return fn.apply(this,cacheParams);
 					}
-					// 返回Temp引用 但是外层cacheParams的值不变
+					
 					return Temp;
 				}
 			}
-			// sum = currying3(sum,1);
-			// console.log(sum(1));
 			
-			sum = currying3(sum,2);
-			console.log(sum(2)(3));
+			add = currying(add);
+			let res = add(1)(2,3)(4);
+			console.log('res',res);
+			
+			
+			var obj = {
+				name:"lilei"
+			};
+			
+			var name = 'wangwei';
+			
+			function readInfo(age){
+				return this.name + age;
+			}
+			
+			console.log(readInfo(18));
+			readInfo = readInfo.bind(obj,20);
+			console.log(readInfo());
+			
+			Function.prototype._bind = function(context){
+				// 获取传入的要绑定的this对象
+				context = context || window;
+				// 保存原函数的引用
+				let that = this;
+				// 记录原函数在调用时传递的参数
+				let outerParams = [].slice.call(arguments,1);
+				
+				// 返回一个绑定thisArg的匿名函数
+				return function(innerArgs){
+					// 参数合并
+					let args = outerParams.concat(innerArgs);
+					// 执行函数时绑定的this为传入的context
+					return that.apply(context,args);
+				}
+			}
+			
+			_readInfo = readInfo._bind(obj,30);
+			console.log(_readInfo());
+			
+			
+			function demo(){
+				console.log(arguments.length)
+			}
+			demo(0)
+			
+			
+		</script>
+		
+		<script>
+			Function.prototype.uncurrying = function(){
+				let that = this;
+				return function(thisArg,...otherArgs){
+					return that.apply(thisArg,otherArgs);
+				}
+			}
+			
+			let commonPush = Array.prototype.push.uncurrying();
+			
+			let arr = [1,2,3];
+			let arrLike = {
+				0:100,
+				length:1
+			};
+			commonPush(arr,4,5); // 返回新的length 5
+			commonPush(arrLike,200,300);  // 返回新的length 3
+			console.log(arr);
+			console.log(arrLike);
+			
+			
 			
 		</script>
 	</body>
