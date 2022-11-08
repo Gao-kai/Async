@@ -1,33 +1,11 @@
 /* 
-	手写Promise A+规范4.0版
-	这一版主要实现resolvePromsie的实现
+	手写Promise A+规范5.0版
 	
-	额外知识点：
-	
-	p.then().then().then((res)=>{},(err)=>{})
-	A+规范：then方法的两个参数是可选参数，如果不存在，那么参数可以 透传
-	模拟实现：
-	p.then(data=>{
-		return data;
-	}).then(data=>{
-		return data;
-	}).then((data)=>{console.log(data)});
-	
-	p.then(null,err=>{
-		throw err;
-	}).then(null,err=>{
-		throw err;
-	}).then(data=>{
-		console.log(data);
-	},err=>{
-		console.log(err)
-	}});
-	
-	
+	主要是实例的catch方法和finally方法的实现
+	以及Promise的两个静态方法
+	Promise.resolve()和Promise.reject()
 	
  */
-
-
 class MyPromise {
 
 	/* 定义Promise实例的三种状态 */
@@ -66,6 +44,12 @@ class MyPromise {
 		 */
 
 		const resolve = (value) => {
+			// 如果value是MyPromise实例 那么就调用then方法
+			// 直到这个value被递归解析成为一个普通值  
+			if (value instanceof MyPromise) {
+				return value.then(resolve, reject);  // 这里加return的意思在不要让代码向下执行 而不是要返回值 这里的返回值没用
+			}
+
 			if (this.status === this.PENDING) {
 				this.value = value;
 				this.status = this.FULFILLED;
@@ -179,7 +163,78 @@ class MyPromise {
 
 		return promise2;
 	}
+
+	/**
+	 * @param {Object} onRejected 失败回调
+	 * catch其实就是then的第一个参数为null的简写
+	 * catch方法也返回一个promise实例
+	 */
+	catch (onRejected) {
+		return this.then(null, onRejected);
+	}
+
+	/**
+	 * @param {Object} onFinally
+	 * finally指的不是最终，而是无论成功还是失败都会执行的意思
+	 * 如果Promsie.reject('err').finally() 那么后面必须捕获错误 也就是.catch
+	 * finally并不会影响普通值的promise走向
+	 * finally的回调里面如果返回了一个promsie，它会等待这个promsie执行完毕，如果结果为成功，那么继续执行
+	 * 如果结果失败，那么就会把失败的结果当做传递下去
+	 * 
+	 * 因为finally方法返回新的promsie
+	 */
+	finally(onFinally) {
+		return this.then(
+			(value) => {
+				// 成功执行回调
+				return MyPromise.resolve(onFinally()).then(() => {
+					// 这里是一开始调用finally方法的那个promsie的成功的原因
+					return value;
+				}, (err) => {
+					// 这里是onFinally回调在执行的过程中生成pormise内部失败的原因
+					throw err;
+				})
+			}, (resaon) => {
+				// 失败也会执行回调
+				return MyPromise.resolve(onFinally()).then(() => {
+					// 这里是一开始调用finally方法的那个promsie的失败的原因
+					throw resaon;
+				}, (err) => {
+					// 这里是onFinally回调在执行的过程中生成pormise内部失败的原因
+					throw err;
+				})
+			})
+	}
+
 }
+
+/* 
+	静态方法resolve 快速创建一个状态为成功的Pormise实例
+	这里需要考虑的是如果MyPromise.resolve(new MyPromise((resolve,reject)=>{
+		resolve(100)}
+		)
+	)
+	也就是MyPromise.resolve的参数不是一个普通值 而是一个新的Promsie实例 
+	也就是我们还需要考虑当我们一开始new一个Promsie的时候 如果executor中resolve了一个新的promsie实例 该如何处理？
+	答案就是如果resolve方法的参数是一个promsie实例话 就取出这个实例的then方法并执行 然后将结果也就是新的promise返回 递归解析
+ */
+MyPromise.resolve = function(value) {
+	return new MyPromise((resolve, reject) => {
+		resolve(value); // 如果value是一个promsie，那么执行resolve方法会返回一个新的promise，这个新的promsie的值就是解析了value的promise 但是并不关心 真正关心的是要return出去的那个要给被人.then的promise的状态和值 很多时候不要关心返回值 而要把重点放在返回出去的promsie的状态是否变化
+	})
+}
+
+/* 
+	静态方法reject 快速创建一个状态为失败的Pormise实例
+	
+	MyPromise.resolve和MyPromise.reject的区别就在于resolve会等待参数为promsie的状态发生改变，而reject不会 这个特点及其重要
+ */
+MyPromise.reject = function(reason) {
+	return new MyPromise((resolve, reject) => {
+		reject(reason);
+	})
+}
+
 
 
 
@@ -275,98 +330,53 @@ function resolvePromise(promise2, x, resolve, reject) {
 
 
 /**
- * 测试用例
+ * finally测试用例
  */
-/* let p1 = new MyPromise((resolve, reject) => {
-	resolve(200);
-	// reject(100);
-	// throw new Error("执行错误")
+
+/* MyPromise.resolve(100).finally(() => {
+	return new MyPromise((resolve, reject) => {
+		setTimeout(() => {
+			resolve(200); // 只会等待 不会将200传递给下一个then的成功回调
+			// reject(200); // 会等待 还会将错误200传递给下一个catch或者失败回调中
+		}, 1000)
+	})
+}).then((res) => {
+	console.log('res', res);
+}).catch((err) => {
+	console.log('err', err);
+})
+ */
+
+
+/**
+ * resolve测试用例
+ */
+const p = new MyPromise((resolve, reject) => {
+	resolve(new MyPromise((resolve, reject) => {
+		resolve(100);
+	}))
 
 });
 
-let p2 = p1.then((res) => {
-	console.log('p1-res', res);
-	return new MyPromise((resolve, reject) => {
-		setTimeout(() => {
-			resolve(new MyPromise((resolve, reject) => {
-				setTimeout(() => {
-					resolve('2000')
-				}, 1000)
-			}))
-		}, 1000)
-	});
-}, (err) => {
-	console.log('p1-err', err);
+p.then((res) => {
+	console.log(res);
+}, err => {
+	console.log(err);
 })
 
 
-p2.then((res) => {
-	console.log('p2-res', res);
-}, (err) => {
-	console.log('p2-err', err);
-})
+
+// module.exports = MyPromise;
+/**
+ * 最终目的是确定promsie2的状态
+ * 1.p1.then的时候，执行构造器z1，定义resolve和reject，执行executor
+ * 2.z2执行executor，读取p1转态和值，决定执行then方法的onFulfilled z3
+ * 3. z3中开始执行，返回了一个x是p3，值为5000，状态ok别管return了到这里
+ * 4. 执行 resolvePromise(promise2,p3,resolve,reject)z4
+ * 5. z4执行，p3.then执行 z5
+ * 6. z5 p3.then执行构造器z6 定义resolve和reject，执行executor
+ * 7. z6 执行executor，读取p3状态态和值为5000，决定执行p3.then方法的onFulfilled z7
+ * 8. 这里的onFulfilled已经给你定义好了 你执行就是了 (y)=>{resolvePromise(promise2,y,resolve,reject)}，但是要将p3的值5000传递给y 
+ * 9. 执行resolvePromise(promise2,5000,resolve,reject)其实就是执行resolve(5000)
+ * 10. promsie2构造完成 值为5000 状态成功
  */
-
-
-/* 
-	这个叫做Promsie的延迟对象 延迟在哪里？
-	
-	解决回调地狱的时候  我还没then呢 你就给我包一层 烦不烦啊
-	你要解决嵌套问题 结果你上来先套一层？？？
-	
-	由于这里在MyPromise上拓展了一个属性defer，这个属性的值是一个对象
-	上面有三个东西，promise实例，resolve方法，reject方法
-	
-	
- */
-MyPromise.defer = MyPromise.deferred = function() {
-	let dfd = {};
-	dfd.promise = new MyPromise((resolve, reject) => {
-		dfd.resolve = resolve;
-		dfd.reject = reject;
-	})
-	return dfd;
-}
-
-
-// function getInfo() {
-// 	return new MyPromise((resolve, reject) => {
-// 		setTimeout(() => {
-// 			let json = {
-// 				name: 'lilei',
-// 				age: 18
-// 			}
-// 			resolve(json);
-// 		}, 2000);
-// 	})
-// }
-
-/* 
-	延迟对象改造后：
-	著名的Q库就是对promise封装了defer
-	Q库还有一个方法是fcall，将一个同步的函数，转换为一个成功的promise对象，支持调用then方法，并且可以把同步函数的返回值，传入then的成功回调中作为参数。
-	Q库的all就是Promise.all
- */
-
-// function getInfo() {
-// 	let dfd = MyPromise.defer();
-// 	// 这里不用再包裹一层return new Promsie了
-// 	setTimeout(() => {
-// 		let json = {
-// 			name: 'lilei',
-// 			age: 18
-// 		}
-// 		dfd.resolve(json); // 这个resolve方法就是要返回的promsie实例上的resolve方法
-// 	}, 2000);
-	
-// 	return dfd.promise; // 返回的是一个promsie实例
-// }
-
-// getInfo().then(res => {
-// 	console.log(res);
-// }, err => {
-// 	console.log(err);
-// })
-
-
-module.exports = MyPromise;

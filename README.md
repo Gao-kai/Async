@@ -6,10 +6,30 @@
 1. 掌握高阶函数的使用，使用高阶函数解决异步问题
 2. 掌握发布订阅模式和观察者模式
 3. 掌握promise核心应用，使用promise解决异步问题
-4. 实现一个完整的promise库
+4. 实现一个完整的promiseA+规范
 5. 掌握promise中常见的面试题
 6. 拓展promise中常见方法all、race和finally
 7. 掌握generator函数的使用以及co库的使用
 8. 掌握异步编程终极解决方案async+await
 9. 掌握浏览器的EventLoop事件环机制
 
+
+## Promsie知识点
+1. Promise基础知识
+2. Promise A+规范手写 并通过测试用例872 passed
+3. Promise.resolve和reject实现
+4. Promise.defer延迟对象 作用和写法a
+5. Promisify实现及批量实现
+6. Promise.all
+7. Promise.race
+8. Promise原型catch和finaly实现
+9. Promise.allSettled
+10. Promise.any
+11. Promise中断链
+12. generator的实现
+13. co库实现
+14. async和await实现
+15. 浏览器eventLoop执行流程
+16. node eventLoop执行流程
+17. 代码输出题
+18. 如何中断一个promise请求
