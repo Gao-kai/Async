@@ -329,17 +329,17 @@ MyPromise.defer = MyPromise.deferred = function() {
 }
 
 
-// function getInfo() {
-// 	return new MyPromise((resolve, reject) => {
-// 		setTimeout(() => {
-// 			let json = {
-// 				name: 'lilei',
-// 				age: 18
-// 			}
-// 			resolve(json);
-// 		}, 2000);
-// 	})
-// }
+function getInfo() {
+	return new MyPromise((resolve, reject) => {
+		setTimeout(() => {
+			let json = {
+				name: 'lilei',
+				age: 18
+			}
+			resolve(json);
+		}, 2000);
+	})
+}
 
 /* 
 	延迟对象改造后：
@@ -348,25 +348,25 @@ MyPromise.defer = MyPromise.deferred = function() {
 	Q库的all就是Promise.all
  */
 
-// function getInfo() {
-// 	let dfd = MyPromise.defer();
-// 	// 这里不用再包裹一层return new Promsie了
-// 	setTimeout(() => {
-// 		let json = {
-// 			name: 'lilei',
-// 			age: 18
-// 		}
-// 		dfd.resolve(json); // 这个resolve方法就是要返回的promsie实例上的resolve方法
-// 	}, 2000);
+function getInfo() {
+	let dfd = MyPromise.defer();
+	// 这里不用再包裹一层return new Promsie了
+	setTimeout(() => {
+		let json = {
+			name: 'lilei',
+			age: 18
+		}
+		dfd.resolve(json); // 这个resolve方法就是要返回的promsie实例上的resolve方法
+	}, 2000);
 	
-// 	return dfd.promise; // 返回的是一个promsie实例
-// }
+	return dfd.promise; // 返回的是一个promsie实例
+}
 
-// getInfo().then(res => {
-// 	console.log(res);
-// }, err => {
-// 	console.log(err);
-// })
+getInfo().then(res => {
+	console.log(res);
+}, err => {
+	console.log(err);
+})
 
 
 module.exports = MyPromise;

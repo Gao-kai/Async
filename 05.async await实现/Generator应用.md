@@ -1,4 +1,6 @@
-// 类数组如何可以被展开，也就是类数组如何被遍历
+## 使用Generator为对象添加迭代器
+首先思考一个问题：类数组如何可以被展开，也就是类数组如何被遍历?
+```js
 const arrayLike = {
   0: "a",
   1: "b",
@@ -8,6 +10,10 @@ const arrayLike = {
 
 console.log([...arrayLike]); // TypeError: object is not iterable
 
+```
+
+我们可以基于[Symbol.iterator]来实现一个默认的迭代器：
+```js
 /* 原生实现让对象可以被迭代 */
 const arrayLike1 = {
   0: "a",
@@ -28,8 +34,10 @@ arrayLike1[Symbol.iterator] = function () {
   };
 };
 console.log([...arrayLike1]); // [ 'a', 'b', 'c' ]
+```
 
-/* 使用生成器函数实现：因为生成器函数默认生成的就是遍历器 */
+使用生成器函数实现：因为生成器函数默认生成的就是遍历器
+```js
 const arrayLike2 = {
   0: "a",
   1: "b",
@@ -44,7 +52,6 @@ arrayLike2[Symbol.iterator] = function* () {
 };
 
 console.log([...arrayLike2]); // [ 'a', 'b', 'c' ]
-
 /* 
 	类数组转数组：
 	1. Array.from(arrayLike); 直接将类数组转为数组
@@ -52,19 +59,15 @@ console.log([...arrayLike2]); // [ 'a', 'b', 'c' ]
 	3. [].slice.call(arrayLike); 
  */
 
-/* 
-	Generator有什么用呢？
-	Generator函数可以实现JS的元编程，比如通过Generator函数让一个原本不可以迭代的对象变得可以迭代，就是给其他非迭代对象添加迭代器接口
+```
 
-	Generator函数还具有将函数中止执行的功能，redux-saga里面用到了Generator函数
-	Generator函数还有一个就是可以解决回调地狱的问题
-
-	当我们在[...obj]的时候，其实就是在：
-	1. 取出obj上的迭代器也就是[Symbol.iterator]属性对应的函数iterator
-	2. 调用这个iterator函数拿到一个迭代器it
-	3. 利用一个while循环和一个外部变量，不停的去调用这个it上的next方法
-	4. 调用next方法会得到value和done，将value不断的存起来，当done为true的时候，停止while循环即可
-	5. 返回value组成的集合数组
+当我们在[...obj]的时候，其实就是在：
+1. 取出obj上的迭代器也就是[Symbol.iterator]属性对应的函数iterator
+2. 调用这个iterator函数拿到一个迭代器it
+3. 利用一个while循环和一个外部变量，不停的去调用这个it上的next方法
+4. 调用next方法会得到value和done，将value不断的存起来，当done为true的时候，停止while循环即可
+5. 返回value组成的集合数组
+```js
 */
 function* read() {
   yield "id-08";
@@ -81,22 +84,21 @@ do {
   call = done;
 } while (!call);
 
-/* 
-value-done id-08 false
-value-done score-100 false
-value-done rank-06 false
-value-done undefined true
-*/
+// value-done id-08 false
+// value-done score-100 false
+// value-done rank-06 false
+// value-done undefined true
+```
+## Generator函数将函数中止执行
+Generator函数可以实现JS的元编程，比如通过Generator函数让一个原本不可以迭代的对象变得可以迭代，就是给其他非迭代对象添加迭代器接口.
+Generator函数还具有将函数中止执行的功能，redux-saga里面用到了Generator函数,Generator函数还有一个就是可以解决回调地狱的问题。
 
+```js
 /* 
-	Generator有什么好处呢？
-	这得从Generator函数的yield表达式的返回值和next方法的参数说起
-	
 	ES6语法规定：
 	每次执行next方法的时候可以传入参数，第一个传入的参数总是无效的；
 	后续每一次调用next方法传入的参数都会被当做上一个yield表达式的返回值
-	举例：
-*/
+ */
 function* read() {
   const v1 = yield "id-08";
   console.log("v1", v1);
@@ -114,13 +116,10 @@ const it = read();
 console.log(it.next("无效的参数"));
 console.log(it.next("100"));
 console.log(it.next("200"));
-console.log(it.next("300"));
+```
+知道以上这个next方法传参的特性，我们就可以基于Generator来实现一个异步请求串行的问题了，虽然还是有嵌套，但是至少有了用处:
 
-/* 
- 知道以上这个next方法传参的特性，我们就可以基于Generator来实现一个异步请求串行的问题了，虽然还是有嵌套，但是至少有了用处
- 
-*/
-
+```js
 function getId() {
   return new Promise((resolve, reject) => {
     setTimeout(() => {
@@ -194,33 +193,34 @@ value.then((data1) => {
     console.log("value&done", value, done); // undefined true
   });
 });
-
-/* 
-	到这里你可能会说这又什么用啊？
-	我直接用promsie.then.then不就好了？但是你有没有发现，之前我们发起请求的代码都需要嵌套来写，比如，它虽说是将回调嵌套扁平化，但是核心还是一个异步的嵌套写法，并没有根本性的改变：
-	getId().then((data)=>{
+```
+到这里你可能会说这又什么用啊？
+我直接用promsie.then.then不就好了？但是你有没有发现，之前我们发起请求的代码都需要嵌套来写，比如，它虽说是将回调嵌套扁平化，但是核心还是一个异步的嵌套写法，并没有根本性的改变：
+```js
+getId().then((data)=>{
 		const {id} = data;
 		return getScore(id);
 	}).then((data)=>{
 		const {score} = data;
 		console.log('最终得到的分数是：',score);
 	})
-
-	但是现在借用Generator可暂停执行以及next传参的特点：我们发起请求的代码采用了同步管理的方式来写：
-	function * request(){
+```
+但是现在借用Generator可暂停执行以及next传参的特点：我们发起请求的代码采用了同步管理的方式来写：
+```js
+function * request(){
 		const {id} = yield getId();
 		const {score} = yield getScore(id);
 		return score;
 	}
-
-	这一看就知道已经有点async和await内味儿了？但是现在我们还需要一直调用next方法然后then里面接着调用next方法才可以实现需求,如果我们可以调用request方法直接既可以完成串行异步请求，又可以返回最后return的值该多好啊，比如：
-
-	request().then((res)=>{
+```
+这一看就知道已经有点async和await内味儿了？但是现在我们还需要一直调用next方法然后then里面接着调用next方法才可以实现需求,如果我们可以调用request方法直接既可以完成串行异步请求，又可以返回最后return的值该多好啊，比如：
+```js
+request().then((res)=>{
 		console.log(res); // res就是最终return的score-100
 	})
-
-	很幸运，有一个库co帮助我们实现了这个需求：
-*/
+```
+很幸运，有一个库co帮助我们实现了这个需求：
+```js
 const co = require("co");
 function getId() {
   return new Promise((resolve, reject) => {
@@ -248,13 +248,12 @@ function* request() {
 co(request()).then((res) => {
   console.log(res); // res就是最终return的score-100
 });
+```
 
-/* 
-	我们如何自己实现一个co函数呢？
-	递归调用的next方法
-	
-*/
-
+## co自动执行器的实现
+我们如何自己实现一个co函数呢？
+	很重要的思想：只要异步迭代的实现，都离不开递归 + 回调函数 + 初次启动
+```js
 function co(it) {
   return new Promise((resolve, reject) => {
     // 只要实现异步迭代 就基于递归调用回调函数next实现并且让next先执行一次
@@ -283,11 +282,10 @@ function co(it) {
     next();
   });
 }
-
-/* 
-	co函数可以简化为：
-	将内部的promise进一步进行简化，成功直接执行next并将参数传入next
-*/
+```
+co函数可以简化为：
+将内部的promise进一步进行简化，成功直接执行next并将参数传入next
+```js
 function co(it) {
   return new Promise((resolve, reject) => {
     function next(data) {
@@ -328,24 +326,4 @@ function* request() {
 co(request()).then((score) => {
   console.log("score", score);
 });
-
-
-/* 
-	co引入起来麻烦
-	所以出现了async-await语法 = Generator + co
-	将async变化为*
-	将await变为yield
-	返回本来就是一个promsie 就替代了原来co干的活
-
-*/
-
-
-async function request() {
-  const { id } = await getId();
-  const { score } = await getScore(id);
-  return score;
-}
-
-request().then((score) => {
-  console.log(score);
-});
+```

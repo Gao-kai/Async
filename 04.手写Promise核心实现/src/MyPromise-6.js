@@ -1,0 +1,228 @@
+/**
+ * 纯净版-Promise A+规范实现 - MyPromise
+ * 1. 基础调用
+ * 2. then的链式调用
+ * 3. resolvePromise
+ * 4. p.then().then().then() 错误透传
+ */
+const PENDING = 'PENDING';
+const FULFILLED = 'FULFILLED';
+const REJECTED = 'REJECTED';
+
+class MyPromise {
+	constructor(executor){
+		this.status = PENDING;
+		this.value = undefined;
+		this.reason = undefined;
+		this.onFulfilledCbList = [];
+		this.onRejectedCbList = [];
+		
+		const resolve = (value)=>{
+			/**
+			 *这里解决的是Promsie.resolve或者new Promsie的时候
+			 * 在构造器内部又resolve了一个新的promsie的问题
+			 * 思路和return一样 都是通过调用then方法 把当前promsie实例的值通过resolve的方法去修改要返回到外部那个promsie实例的值和状态
+			 */
+			if(value instanceof MyPromise){
+				// 核心就在于传递的resolve方法始终是第一次进来的这个构造器自己的
+				let newPromise = value.then(resolve,reject);
+				return newPromise;
+			}
+			
+			if(this.status === PENDING){
+				this.value = value;
+				this.status = FULFILLED;
+				
+				if(this.onFulfilledCbList.length){
+					this.onFulfilledCbList.forEach(cb=>cb());
+				}
+			}
+		}
+		
+		const reject = (reason)=>{
+			if(this.status === PENDING){
+				this.reason = reason;
+				this.status = REJECTED;
+				
+				if(this.onRejectedCbList.length){
+					this.onRejectedCbList.forEach(cb=>cb());
+				}
+			}
+		}
+		
+		try{
+			executor(resolve,reject);
+		}catch(e){
+			reject(e);
+		}
+	}
+	
+	/**
+	 * executor中的this是外部.Then的那个promsie实例，是上一个
+	 * constructor中的this是即将要返回到外部给下一次then的那个promsie实例
+	 */
+	then(onFulfilled,onRejected){
+		// 透传机制实现
+		onFulfilled = typeof onFulfilled === 'function'? onFulfilled : v=>v;
+		onRejected = typeof onRejected === 'function'? onRejected : (e)=>{
+			// 这里是什么错误就抛什么 不能包装之后再抛出去
+			throw e;
+		}
+		
+		let promise2 = new MyPromise((resolve,reject)=>{
+			if(this.status === PENDING){
+				this.onFulfilledCbList.push(()=>{
+					setTimeout(()=>{
+						try{
+							let x = onFulfilled(this.value);
+							resolvePromise(promise2,x,resolve,reject);
+						}catch(e){
+							reject(e);
+						}
+					},0)
+				})
+				
+				this.onRejectedCbList.push(()=>{
+					setTimeout(()=>{
+						try{
+							let x = onRejected(this.reason);
+							resolvePromise(promise2,x,resolve,reject);
+						}catch(e){
+							reject(e);
+						}
+					},0)
+				})
+			}
+			
+			if(this.status === FULFILLED){
+				setTimeout(()=>{
+					try{
+						let x = onFulfilled(this.value);
+						resolvePromise(promise2,x,resolve,reject);
+					}catch(e){
+						reject(e);
+					}
+				},0)
+			}
+			
+			if(this.status === REJECTED){
+				setTimeout(()=>{
+					try{
+						let x = onRejected(this.reason);
+						resolvePromise(promise2,x,resolve,reject);
+					}catch(e){
+						reject(e);
+					}
+				},0)
+			}
+		})
+		
+		return promise2;
+	}
+	
+	catch(onRejected){
+		return this.then(null,onRejected);
+	}
+	
+	/**
+	 * @param {Object} onFinally es10的语法
+	 * 
+	 * finally方法的回调onFinally方法是没有参数的，表示不管成功还是失败都会执行的意思
+	 * 
+	 * finally方法会返回一个新的promsie
+	 * 
+	 * finally方法的调用者promise无论成功还是失败都必须要执行回调onFinally
+	 * 
+	 * 	finally方法的回调onFinally的返回值如果是普通值，那么忽略
+	 * 	finally方法的回调onFinally执行过程中出错，那么会传递给下一个then的失败回调
+	 * 	finally方法的回调onFinally的返回值如果是一个新的promsie，那么收下会等待promise执行完毕
+	 * 		+ 如果状态成功，会忽略新的promsie成功的值；而是将最初调用自己的那个promsie的value resolve出去
+	 * 		+ 如果状态失败，那么会将错误抛出
+	 * 
+	 */
+	finally(onFinally){
+		// 核心是个then finally==> 转化为一个then
+		return this.then((value)=>{
+			return Promise.resolve(onFinally()).then((n)=>{
+				return value;
+			},(m)=>{
+				throw m;
+			})
+		},(err)=>{
+			return Promise.resolve(onFinally()).then((n)=>{
+				throw err;
+			},(m)=>{
+				throw m;
+			})
+		})
+	}
+}
+
+
+	
+MyPromise.resolve = function(value){
+	return new MyPromise((resolve,reject)=>{
+		resolve(value);
+	})
+}	
+
+MyPromise.reject = function(reason){
+	return new MyPromise((resolve,reject)=>{
+		reject(reason);
+	})
+}
+
+
+
+/**
+ * 主要解决的是执行成功或者失败回调之后的返回值
+ * 是一个普通值
+ * 还是一个新的promise，如果是的话，需要将这个新的promise实例解析出内部resolve或者reject的值，外部下个then的成功回调会得到resolve的普通值为止
+ */
+function resolvePromise(promise2,x,resolve,reject){
+	if(x === promise2){
+		throw new TypeError('Chaining cycle detected for promise #<Promise>')
+	}
+	
+	if((typeof x === 'object' && x !== null) || typeof x === 'function'){
+		let called = false;
+		try{
+			let then = x.then;
+			if(typeof then === 'function'){
+				then.call(x,(y)=>{
+					// 核心就在于递归的不变量保持为promise2、resolve、reject
+					// 而不是返回的x 
+					if (called) return;
+					called = true;
+					resolvePromise(promise2,y,resolve,reject)
+				},(r)=>{
+					if (called) return;
+					called = true;
+					reject(r);
+				})
+			}else{
+				// 说明取出来的then是一个对象 
+				resolve(x);
+			}
+		}catch(e){
+			if (called) return;
+			called = true;
+			reject(e);
+		}
+		
+		
+	}else{
+		resolve(x); // 这里的作用就是将promise2的状态和值进行确定，返回隐式返回给外面 宣布promsie2实例构造完成
+	}
+}
+
+MyPromise.defer = MyPromise.deferred = function() {
+	let dfd = {};
+	dfd.promise = new MyPromise((resolve, reject) => {
+		dfd.resolve = resolve;
+		dfd.reject = reject;
+	})
+	return dfd;
+}
+
+module.exports = MyPromise;
