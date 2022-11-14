@@ -23,8 +23,8 @@
 6. Promise.all ⭐
 7. Promise.race ⭐
 8. Promise原型catch和finaly实现 ⭐
-9. Promise.allSettled
-10. Promise.any
+9. Promise.allSettled ⭐
+10. Promise.any ⭐
 11. Promise中断链 ⭐
 12. generator的实现 ⭐
 13. co库实现 ⭐
